@@ -8,10 +8,8 @@ const int accCaliIterations = 2000;
 
 
 float accX, accY, accZ;
-float accX_Cali {0} 
-float accY_Cali {0} 
-float accZ_Cali {0};
-float angleRoll, anglePitch, angleYaw;
+float accX_Cali, accY_Cali, accZ_Cali;
+float angleRoll, anglePitch,anglePitch1, angleYaw;
 
 float loopTimer;
 
@@ -41,22 +39,32 @@ void acc_signals(void){
   accX = (float)accX_LSB/4096;
   accY = (float)accY_LSB/4096;
   accZ = (float)accZ_LSB/4096;
-
-  //angleRoll = atan(accY/sqrt(accX*accX + accZ*accZ))*180/3.142;
-  //anglePitch = atan(-accX/sqrt(accY*accY + accZ*accZ))*180/3.142;
-  //anglePitch1 = atan(accZ/sqrt(accX*accX + accY*accY))*180/3.142;
 }
 
-void acc_cali(iterations){
-  for(int i = 0; i<iterations; ++i){
-    acc_signals();
-    accX_Cali += accX;
-    accY_Cali += accY;
-    accZ_Cali += accZ;
+void gyro_cali(int iterations){
+  for(int i = 0; i < iterations; ++i){
+    gyro_signals();
+    rateRollCali += rateRoll;
+    ratePitchCali += ratePitch;
+    rateYawCali += rateYaw;
+    delay(1);
   }
-  accX_Cali /=iterations;
-  accY_Cali /=iterations;
-  accZ_Cali /=iterations;
+  rateRollCali /= rateCaliIterations;
+  ratePitchCali /= rateCaliIterations;
+  rateYawCali /= rateCaliIterations;
+}
+
+void acc_readings(float accX_Cali, float accY_Cali,float accZ_Cali ){
+  acc_signals();
+  accX-=accX_Cali;
+  accY-=accY_Cali;
+  accZ-=accZ_Cali;
+}
+
+void get_angles(void){
+  angleRoll = atan(accY/sqrt(accX*accX + accZ*accZ))*180/3.142;
+  anglePitch = atan(-accX/sqrt(accY*accY + accZ*accZ))*180/3.142;
+  anglePitch1 = atan(accZ/sqrt(accX*accX + accY*accY))*180/3.142;
 }
 
 
@@ -106,27 +114,12 @@ void setup(void) {
   Wire.write(0x6B);
   Wire.write(0X00);
   Wire.endTransmission();
-
-  /*
-  for(int i = 0; i < rateCaliIterations; ++i){
-    gyro_signals();
-    rateRollCali += rateRoll;
-    ratePitchCali += ratePitch;
-    rateYawCali += rateYaw;
-    delay(1);
-  }
-  rateRollCali /= rateCaliIterations;
-  ratePitchCali /= rateCaliIterations;
-  rateYawCali /= rateCaliIterations;
-  */
-
-  for(int i = 0; i < accCaliIterations; ++i){
-    acc_signals
-  }
 }
 
 void loop() {
-  acc_signals();
+
+  acc_readings(0.12, -0.03, 0.01);
+  get_angles();
   /*
   rateRoll -= rateRollCali;
   ratePitch -= ratePitchCali;
@@ -141,14 +134,15 @@ void loop() {
   Serial.println();
   */
 
-  Serial.print(" Acceleration X [g] = ");
-  Serial.print(accX);
+  Serial.print(" Roll angle[degree] = ");
+  Serial.print(angleRoll);
 
-  Serial.print(" Acceleration Y [g] = ");
-  Serial.print(accY);
+  Serial.print(" Pitch angle[degree] = ");
+  Serial.print(anglePitch);
 
-  Serial.print(" Acceleration Z [g] = ");
-  Serial.print(accZ);
+  Serial.print(" Pitch1 angle[degree] = ");
+  Serial.print(anglePitch1);
+
   Serial.println();
   delay(50);
 }
