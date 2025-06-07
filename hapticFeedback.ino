@@ -11,7 +11,27 @@ float accX, accY, accZ;
 float accX_Cali, accY_Cali, accZ_Cali;
 float angleRoll, anglePitch,anglePitch1, angleYaw;
 
-float loopTimer;
+float kalmanAngleRoll = 0, 
+      kalmanUncertaintyAngleRoll = 2*2;
+
+float kalmanAnglePitch = 0, 
+      kalmanUncertaintyAnglePitch = 2*2;
+
+float kalman1DOutput[] = {0,0}; //{angle prediction, uncertainty}
+
+void kalman_1d(float kalmanState, float kalmanUncertainty, float kalmanInput, float kalmanMeasurement){
+  kalmanState += 0.004*kalmanInput;
+  kalmanUncertainty += 0.004 * 0.004 * 4 * 4;
+  float kalmanGain = kalmanUncertainty * 1/(1*kalmanUncertainty + 3*3);
+  kalmanState += kalmanGain*(kalmanMeasurement-kalmanState);
+  kalmanUncertainty = (1-kalmanGain) * kalmanUncertainty;
+  kalman1DOutput[0] = kalmanState;
+  kalman1DOutput[1] = kalmanUncertainty;
+
+}
+
+
+uint32_t loopTimer;
 
 void acc_signals(void){
   Wire.beginTransmission(0x68); //start I2C communication with gyro
@@ -99,6 +119,8 @@ void gyro_signals(void){
   rateRoll = (float)gyroX/65.5; 
   ratePitch = (float)gyroY/65.5; 
   rateYaw = (float)gyroZ/65.5; 
+
+
 }
 
 void setup(void) {
@@ -114,26 +136,43 @@ void setup(void) {
   Wire.write(0x6B);
   Wire.write(0X00);
   Wire.endTransmission();
+  gyro_cali(rateCaliIterations);
+
+  loopTimer = micros();
 }
 
 void loop() {
+  gyro_signals();
 
-  acc_readings(0.12, -0.03, 0.01);
-  get_angles();
-  /*
+  
   rateRoll -= rateRollCali;
   ratePitch -= ratePitchCali;
   rateYaw -= rateYawCali;
-  //print results in degree/s
-  Serial.print("Roll rate [degree/s] = ");
-  Serial.print(rateRoll);
-  Serial.print("Pitch rate [degree/s] = ");
-  Serial.print(ratePitch);
-  Serial.print("Yaw rate [degree/s] = ");
-  Serial.print(rateYaw);
-  Serial.println();
-  */
 
+  acc_readings(0.12, -0.03, 0.01);
+  get_angles();
+
+  kalman_1d(kalmanAngleRoll, kalmanUncertaintyAngleRoll, rateRoll, angleRoll);
+  kalmanAngleRoll = kalman1DOutput[0];
+  kalmanUncertaintyAngleRoll - kalman1DOutput[1];
+  kalman_1d(kalmanAnglePitch, kalmanUncertaintyAnglePitch, ratePitch, anglePitch);
+  kalmanAnglePitch = kalman1DOutput[0];
+  kalmanUncertaintyAnglePitch - kalman1DOutput[1];
+
+
+
+
+  //print results in degree/s
+  Serial.print("Roll angle [degree] = ");
+  Serial.print(kalmanAngleRoll);
+  Serial.print("Pitch angle [degree] = ");
+  Serial.print(kalmanAnglePitch);
+
+  Serial.println();
+  while(micros() - loopTimer < 4000);
+  loopTimer = micros();
+  
+  /*
   Serial.print(" Roll angle[degree] = ");
   Serial.print(angleRoll);
 
@@ -144,5 +183,6 @@ void loop() {
   Serial.print(anglePitch1);
 
   Serial.println();
-  delay(50);
+  */
+  //delay(50);
 }
