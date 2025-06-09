@@ -1,14 +1,17 @@
 #include <Wire.h>
+#include <cmath>
 
 float rateRoll, ratePitch, rateYaw;
 float rateRollCali, ratePitchCali, rateYawCali;
 
 const int rateCaliIterations = 2000;
 const int accCaliIterations = 2000;
+const float pi {3.142};
 
 
 float accX, accY, accZ;
 float accX_Cali, accY_Cali, accZ_Cali;
+float accX_Lin, accY_Lin, accZ_Lin;
 float angleRoll, anglePitch,anglePitch1, angleYaw;
 
 float kalmanAngleRoll = 0, 
@@ -56,7 +59,8 @@ void acc_signals(void){
   int16_t accY_LSB = Wire.read() <<8 | Wire.read();
   int16_t accZ_LSB = Wire.read() <<8 | Wire.read();
 
-  accX = (float)accX_LSB/4096;
+  //results in g
+  accX = (float)accX_LSB/4096;  
   accY = (float)accY_LSB/4096;
   accZ = (float)accZ_LSB/4096;
 }
@@ -123,6 +127,16 @@ void gyro_signals(void){
 
 }
 
+void getLinear(void){
+  float gravity_x {std::sin(angleRoll*pi/180)};
+  float gravity_y {std::sin(anglePitch*pi/180)};
+  float gravity_z {1 - gravity_x - gravity_y};
+  accX_Lin = accX - gravity_x;
+  accY_Lin = accY - gravity_y;
+  accZ_Lin = accZ - gravity_z;
+
+}
+
 void setup(void) {
   Serial.begin(57600);
   
@@ -159,16 +173,37 @@ void loop() {
   kalmanAnglePitch = kalman1DOutput[0];
   kalmanUncertaintyAnglePitch - kalman1DOutput[1];
 
-
-
-
-  //print results in degree/s
-  Serial.print("Roll angle [degree] = ");
-  Serial.print(kalmanAngleRoll);
-  Serial.print("Pitch angle [degree] = ");
-  Serial.print(kalmanAnglePitch);
-
+  getLinear();
+  //print results in m/s^2
+  /*
+  Serial.print(" acc X [g]: ");
+  Serial.print(accX);
+  Serial.print(" acc Y [g]: ");
+  Serial.print(accY);
+  Serial.print(" acc Z [g]: ");
+  Serial.print(accZ);
   Serial.println();
+  */
+  //print results in degree/s
+  /*
+  Serial.print("Roll_angle:");
+  Serial.print(kalmanAngleRoll);
+  Serial.print(",");
+  Serial.print("Pitch_angle:");
+  Serial.print(kalmanAnglePitch);
+  Serial.println();
+  */
+  
+  Serial.print("accx_in_g:");
+  Serial.print(accX_Lin);
+  Serial.print(",");
+  Serial.print("accy_in_g:");
+  Serial.print(accY_Lin);
+  Serial.print(",");
+  Serial.print("accz_in_g:");
+  Serial.print(accZ_Lin);
+  Serial.println();
+  
   while(micros() - loopTimer < 4000);
   loopTimer = micros();
   
