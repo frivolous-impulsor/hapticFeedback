@@ -49,6 +49,8 @@ THE SOFTWARE.
 
 #include "I2Cdev.h"
 
+#include <vector>
+
 #include "MPU6050_6Axis_MotionApps20.h"
 //#include "MPU6050.h" // not necessary if using MotionApps include file
 
@@ -252,6 +254,46 @@ void setup() {
 // ===                    MAIN PROGRAM LOOP                     ===
 // ================================================================
 
+const double epsilon {0.2};
+std::vector<double> force {0, 0, 0};
+
+
+double getNorm(std::vector<double> v){
+    return std::sqrt(std::pow(v[0], 2)+std::pow(v[1], 2)+std::pow(v[2], 2));
+}
+
+void getDerivative(){
+    unsigned long initTime {millis()};
+    mpu.dmpGetQuaternion(&q, fifoBuffer);
+    mpu.dmpGetAccel(&aa, fifoBuffer);
+    mpu.dmpGetGravity(&gravity, &q);
+    mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
+    mpu.dmpGetLinearAccelInWorld(&aaWorld, &aaReal, &q);
+    Serial.print("change of force\t");
+    std::vector<double> currentForce {static_cast<double>(aaWorld.x)/8192 * 9.81, static_cast<double>(aaWorld.y)/8192 * 9.81, static_cast<double>(aaWorld.z)/8192 * 9.81};
+    
+    std::vector<double> diffForce {currentForce[0]-force[0], currentForce[1]-force[1], currentForce[2]-force[2]};
+    force[0] = currentForce[0];
+    force[1] = currentForce[1];
+    force[2] = currentForce[2];
+    unsigned long finalTime {millis()};
+    unsigned long diffTime {1};
+    std::vector<double> derivative {diffForce[0]/diffTime, diffForce[1]/diffTime, diffForce[2]/diffTime};
+    if(getNorm(derivative) < epsilon){
+        //local extreme detected
+        Serial.print("\n ======== FORCE SPIKE! ======== \n");
+
+
+    }
+
+
+    Serial.print(derivative[0]);
+    Serial.print("\t");
+    Serial.print(derivative[1]);
+    Serial.print("\t");
+    Serial.println(derivative[2]);
+} 
+
 void loop() {
     // if programming failed, don't try to do anything
     if (!dmpReady) return;
@@ -312,20 +354,8 @@ void loop() {
         #ifdef OUTPUT_READABLE_WORLDACCEL
             // display initial world-frame acceleration, adjusted to remove gravity
             // and rotated based on known orientation from quaternion
-            mpu.dmpGetQuaternion(&q, fifoBuffer);
-            mpu.dmpGetAccel(&aa, fifoBuffer);
-            mpu.dmpGetGravity(&gravity, &q);
-            mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);
-            mpu.dmpGetLinearAccelInWorld(&aaWorld, &aaReal, &q);
-            Serial.print("aworld\t");
-            float accX {static_cast<float>(aaWorld.x)/8192 * 9.81};
-            float accY {static_cast<float>(aaWorld.y)/8192 * 9.81};
-            float accZ {static_cast<float>(aaWorld.z)/8192 * 9.81};
-            Serial.print(accX);
-            Serial.print("\t");
-            Serial.print(accY);
-            Serial.print("\t");
-            Serial.println(accZ);
+            getDerivative();
+            
         #endif
     
         #ifdef OUTPUT_TEAPOT
